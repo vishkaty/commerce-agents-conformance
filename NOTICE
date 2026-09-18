@@ -1,0 +1,8 @@
+commerce-agents-conformance
+Copyright 2026 Vishal Katyal
+
+The spec statements in src/commerce_conformance/spec.yaml are distilled from the
+documentation and docstrings of Anthropic's reference implementation,
+https://github.com/anthropics/commerce-agents (Copyright 2026 Anthropic PBC,
+Apache License 2.0). Each statement names its source. The example target under
+examples/retail_mock runs against that repository's retail mock at the pinned commit.

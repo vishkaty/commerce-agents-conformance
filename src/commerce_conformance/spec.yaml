@@ -1,0 +1,616 @@
+# The Claude Commerce Agents conformance spec: numbered normative statements distilled
+# from the upstream repository's own documents, plus hardening statements that go beyond
+# the written contract (area HS) and the end-to-end flows the Medusa adapter pins (area E2E).
+#
+# id:        what a test is marked with (`@spec("BE-S-01")`)
+# methods:   the backend methods or tools the statement is about (contract.py joins on it)
+# source:    where the statement comes from in upstream (file and section or symbol);
+#            "hardening" means this suite proposes it and upstream does not state it
+# upstream_tests: statements already pinned by the reference repository's own suite (informational)
+# adapter_tests: statements pinned by the Medusa adapter's suite, paths relative to
+#            https://github.com/vishkaty/commerce-agents-medusa (informational)
+
+version: 2026-09-09
+areas:
+  - id: BE-S
+    title: StorefrontBackend contract
+    layer: backend-storefront
+    statements:
+      - id: BE-S-01
+        methods: [search_products]
+        text: search_products returns at most `limit` results, best first, and an empty list when nothing matches.
+        source: shopping_agent/backend.py search_products
+      - id: BE-S-02
+        methods: [search_products]
+        text: search_products returns a family as one result; its variants are never results of their own.
+        source: shopping_agent/backend.py search_products; docs/backends.md Step 4
+      - id: BE-S-03
+        methods: [get_product_details]
+        text: get_product_details returns the full record for a known id and None for an unknown id.
+        source: shopping_agent/backend.py get_product_details
+      - id: BE-S-04
+        methods: [get_product_details]
+        text: A family's details carry every purchasable variant with option_values and variant_of; a variant's id returns that variant.
+        source: shopping_agent/backend.py get_product_details; docs/backends.md Step 4
+      - id: BE-S-05
+        methods: [get_product_details]
+        text: A family's price is its lowest in-stock variant's and it is in stock while any variant is.
+        source: docs/backends.md "A family's own figures"
+      - id: BE-S-06
+        methods: [get_cart]
+        text: get_cart returns an empty cart for a session that has added nothing.
+        source: shopping_agent/backend.py get_cart
+      - id: BE-S-07
+        methods: [add_to_cart, get_cart]
+        text: add_to_cart adds a purchasable id and returns the whole cart; lines belong to the session that added them.
+        source: shopping_agent/backend.py add_to_cart; demo_common contract "cart lines belong to the session"
+      - id: BE-S-08
+        methods: [add_to_cart]
+        text: add_to_cart of a variant that exists but cannot be bought raises Unavailable naming ids only, and writes nothing.
+        source: shopping_agent/backend.py Unavailable; docs/backends.md "Out of stock"
+      - id: BE-S-09
+        methods: [update_cart_item]
+        text: update_cart_item sets a held line to the quantity; a product the cart does not hold leaves the cart as it is.
+        source: shopping_agent/backend.py update_cart_item
+      - id: BE-S-10
+        methods: [remove_from_cart]
+        text: remove_from_cart removes a held line; a product the cart does not hold leaves the cart as it is.
+        source: shopping_agent/backend.py remove_from_cart
+      - id: BE-S-11
+        methods: [get_preferences]
+        text: get_preferences returns a profile for every session, a guest included.
+        source: shopping_agent/backend.py get_preferences; docs/backends.md Step 1
+      - id: BE-S-12
+        methods: [get_orders]
+        text: get_orders returns the customer's own orders newest first, at most `limit`; a customer without orders gets an empty list.
+        source: shopping_agent/backend.py get_orders
+      - id: BE-S-13
+        methods: [get_order]
+        text: get_order returns None for an unknown id.
+        source: shopping_agent/backend.py get_order
+      - id: BE-S-14
+        methods: [search_policies]
+        text: search_policies returns the passages matching the query and an empty list when none do.
+        source: shopping_agent/backend.py search_policies
+      - id: BE-S-15
+        methods: [get_fulfillment_options]
+        text: get_fulfillment_options returns options for known ids and skips ids the catalog does not know.
+        source: shopping_agent/backend.py get_fulfillment_options
+      - id: BE-S-16
+        methods: [checkout_handoff]
+        text: checkout_handoff returns an empty list by default, or https URLs the host renders; no backend method places an order.
+        source: shopping_agent/backend.py checkout_handoff; docs/safety.md "No payment"
+      - id: BE-S-17
+        methods: [search_products]
+        text: search_products honours filters; every result respects max_price and sort=price_asc yields non-decreasing prices.
+        source: shopping_agent/backend.py search_products; types.py SearchFilters
+      - id: BE-S-18
+        methods: [search_products, get_product_details]
+        text: Odd input (empty, very long, unicode, regex or path characters) never raises; search returns a list and details returns None.
+        source: shopping_agent/backend.py class docstring ("any other exception as the tool being temporarily unavailable")
+      - id: BE-S-19
+        methods: [add_to_cart]
+        text: A second add of the same id adds to the existing line; the cart holds one line per id.
+        source: shopping_agent/backend.py add_to_cart ("Add quantity to the line")
+      - id: BE-S-20
+        methods: [add_to_cart, get_product_details]
+        text: A cart line's title and price match the product record and the cart's currency matches the product's.
+        source: types.py CartItem; docs/backends.md Step 2
+      - id: BE-S-21
+        methods: [get_product_details]
+        text: A family record is consistent; options are non-empty, every variant sets exactly the family's options with listed values, and no two variants share the same values.
+        source: docs/backends.md Step 4; types.py Product.options
+      - id: BE-S-22
+        methods: [get_order]
+        text: get_order returns None for an order that belongs to another customer.
+        source: shopping_agent/backend.py get_order ("or belongs to someone else")
+      - id: BE-S-23
+        methods: [get_orders]
+        text: Every order carries an id, a status, a placed_at, a non-negative total and items with quantity of at least one.
+        source: types.py Order, OrderItem
+      - id: BE-S-24
+        methods: [search_policies]
+        text: search_policies matches regardless of case and returns the same passages for the same query.
+        source: shopping_agent/backend.py search_policies
+      - id: BE-S-25
+        methods: [add_to_cart]
+        text: Concurrent adds of the same id from one session both land; the backend applies its rules atomically.
+        source: shopping_agent/backend.py class docstring ("atomically, since the executor's lock covers one process's session only")
+      - id: BE-S-26
+        methods: [get_disclosure]
+        text: get_disclosure returns None for a product without one (the default) or a Disclosure whose product_id is the product asked for.
+        source: shopping_agent/backend.py get_disclosure
+      - id: BE-S-27
+        methods: [get_account_context]
+        text: get_account_context returns None (the default) or a small JSON-serialisable dict, since it rides on every request.
+        source: shopping_agent/backend.py get_account_context ("keep it small")
+      - id: BE-S-28
+        methods: [search_policies, get_fulfillment_options]
+        text: search_policies and get_fulfillment_options never raise on odd input; they return a list.
+        source: shopping_agent/backend.py class docstring
+
+  - id: BE-M
+    title: MerchantBackend contract
+    layer: backend-merchant
+    statements:
+      - id: BE-M-01
+        methods: [get_business_snapshot]
+        text: get_business_snapshot returns a period with sales and orders; a figure the store cannot supply is None, never a stand-in zero.
+        source: merchant_agent/backend.py get_business_snapshot; docs/backends.md Step 6
+      - id: BE-M-02
+        methods: [query_metrics]
+        text: query_metrics returns dated points for a known metric; a segment or metric the store cannot supply comes back with no points and a note.
+        source: merchant_agent/backend.py query_metrics
+      - id: BE-M-03
+        methods: [search_listings]
+        text: search_listings returns families, never their variants, and honours the filters it is given.
+        source: merchant_agent/backend.py search_listings
+      - id: BE-M-04
+        methods: [get_listing]
+        text: get_listing returns the full record for a known id, its variants for a family, and None for an unknown id.
+        source: merchant_agent/backend.py get_listing
+      - id: BE-M-05
+        methods: [get_inventory_alerts]
+        text: get_inventory_alerts returns alerts that name purchasable listings with their stock; an empty list means nothing is flagged.
+        source: merchant_agent/backend.py get_inventory_alerts
+      - id: BE-M-06
+        methods: [get_order_issues]
+        text: get_order_issues returns a list of open exceptions, possibly empty.
+        source: merchant_agent/backend.py get_order_issues
+      - id: BE-M-07
+        methods: [get_pricing_context]
+        text: get_pricing_context returns context for a known listing or variant, per-variant contexts for a family, and None for an unknown id.
+        source: merchant_agent/backend.py get_pricing_context
+      - id: BE-M-08
+        methods: [stage_inventory_action, stage_price_update, stage_listing_update, stage_promotion, stage_campaign]
+        text: Every stage_* method records a proposal stamped with the operator without touching live state.
+        source: merchant_agent/backend.py class docstring; demo_common contract "staging is the agent's proposal"
+      - id: BE-M-09
+        methods: [stage_price_update, stage_inventory_action]
+        text: A price update or a restock that names a family is refused; they name a variant.
+        source: docs/backends.md Step 5
+      - id: BE-M-10
+        methods: [get_pending_changes]
+        text: get_pending_changes lists exactly the changes staged but not yet applied or discarded.
+        source: merchant_agent/backend.py get_pending_changes
+      - id: BE-M-11
+        methods: [apply_change]
+        text: apply_change performs the platform write for a staged change, marks it applied by the operator, and the next read reflects it.
+        source: merchant_agent/backend.py apply_change
+      - id: BE-M-12
+        methods: [apply_change]
+        text: apply_change refuses an unknown id and a change that is not currently staged.
+        source: merchant_agent/backend.py apply_change
+      - id: BE-M-13
+        methods: [discard_change]
+        text: discard_change marks a staged change discarded and records who discarded it and on whose initiative.
+        source: merchant_agent/backend.py discard_change
+      - id: BE-M-14
+        methods: [stage_price_update]
+        text: A price move beyond max_price_delta_pct is refused at staging with a GuardrailViolation and nothing is staged.
+        source: merchant_agent/changes.py check_guardrails; docs/safety.md "Guardrails"
+      - id: BE-M-15
+        methods: [stage_promotion]
+        text: A promotion that names a family expands to one line per variant.
+        source: docs/backends.md Step 5
+      - id: BE-M-16
+        methods: [stage_campaign]
+        text: A campaign budget beyond max_campaign_budget is refused at staging.
+        source: merchant_agent/changes.py check_guardrails
+      - id: BE-M-17
+        methods: [stage_inventory_action, apply_change]
+        text: A pause or activation stages a status item and applying it changes the listing's status.
+        source: merchant_agent/backend.py stage_inventory_action; docs/backends.md Step 5
+      - id: BE-M-18
+        methods: [query_metrics]
+        text: query_metrics for a metric the store does not have returns no points and a note, never another metric's series.
+        source: merchant_agent/backend.py query_metrics ("A metric ... the store cannot supply comes back with no points and a note")
+      - id: BE-M-19
+        methods: [stage_price_update, get_pricing_context]
+        text: A non-positive price is refused, and a price under the listing's min_price is refused by the backend's own rule.
+        source: types.py PriceUpdateItem (gt=0); types.py PricingContext.min_price; backend.py class docstring ("the guardrails in changes.py plus its own")
+      - id: BE-M-20
+        methods: [stage_price_update]
+        text: A change with more than max_items_per_change items is refused and nothing is staged.
+        source: merchant_agent/changes.py check_guardrails
+      - id: BE-M-21
+        methods: [stage_promotion]
+        text: A promotion discount beyond max_promotion_discount_pct is refused and nothing is staged.
+        source: merchant_agent/changes.py check_guardrails
+      - id: BE-M-22
+        methods: [stage_listing_update]
+        text: A listing update naming a protected field (listing_id, currency) or a blocked one (price, stock) is refused.
+        source: merchant_agent/config.py protected_fields, listing_update_blocked_fields; changes.py check_guardrails
+      - id: BE-M-23
+        methods: [apply_change, discard_change]
+        text: apply and discard stamp the operator of the session that performed them, not the one that staged.
+        source: merchant_agent/backend.py class docstring ("stamps the session's operator on every change")
+      - id: BE-M-24
+        methods: [get_listing]
+        text: get_listing on a variant's id returns that variant with variant_of set and no variants of its own.
+        source: merchant_agent/backend.py class docstring ("on a variant's id return that variant")
+      - id: BE-M-25
+        methods: [search_listings]
+        text: search_listings honours the status filter and sort=stock_asc yields non-decreasing stock.
+        source: types.py ListingFilters
+      - id: BE-M-26
+        methods: [apply_change]
+        text: When the platform write fails, apply_change raises and the change stays staged.
+        source: merchant_agent/backend.py apply_change ("raise on a failed write so the change stays staged")
+      - id: BE-M-27
+        methods: [stage_campaign]
+        text: stage_campaign naming a campaign_id the store does not have is refused.
+        source: merchant_agent/backend.py stage_campaign ("changes to the one named by campaign_id")
+      - id: BE-M-28
+        methods: [get_campaign_performance]
+        text: get_campaign_performance returns every campaign, or only the one named; an unknown campaign_id yields an empty list; spend and revenue are None when a channel does not report them.
+        source: merchant_agent/backend.py get_campaign_performance; types.py Campaign
+      - id: BE-M-29
+        methods: [execute_analysis_query, get_analysis_schema]
+        text: Analysis is either unsupported (both return None) or a SELECT returns a capped AnalysisTable and anything else is refused.
+        source: merchant_agent/backend.py execute_analysis_query; merchant_agent/analysis.py check_analysis_sql
+      - id: BE-M-30
+        methods: [get_merchant_context]
+        text: get_merchant_context returns None or a small dict whose limitations entries validate as DataLimitation.
+        source: merchant_agent/backend.py get_merchant_context
+      - id: BE-M-31
+        methods: [search_listings, get_listing, get_pricing_context]
+        text: Odd input (empty, very long, unicode, regex or path characters) never raises; search returns a list, listing and pricing reads return None.
+        source: merchant_agent/backend.py class docstring ("any other exception is reported as a temporary failure")
+      - id: BE-M-32
+        methods: [apply_change]
+        text: apply_change for a listing the platform no longer has raises and the change stays staged.
+        source: merchant_agent/backend.py apply_change ("raise on a failed write so the change stays staged")
+
+  - id: EX-S
+    title: Shopping executor over any backend
+    layer: executor-shopping
+    statements:
+      - id: EX-S-01
+        methods: [search_products]
+        text: Search results reach the model fenced under the storefront label and enter the session's provenance.
+        source: docs/safety.md "Fencing"; commerce_common/fencing.py
+      - id: EX-S-02
+        methods: [add_to_cart]
+        text: A cart write for an id no tool returned this session is held by the provenance gate and nothing is written.
+        source: docs/safety.md "Cart provenance"
+      - id: EX-S-03
+        methods: [add_to_cart]
+        text: Adding a family with options still to choose is held by the options gate, which points at its variants.
+        source: docs/safety.md "Cart provenance"; shopping_agent/gates.py
+      - id: EX-S-04
+        methods: [add_to_cart]
+        text: A quantity above max_quantity_per_item is reduced to the cap and the cap is reported.
+        source: docs/safety.md "Cart provenance"
+      - id: EX-S-05
+        methods: [get_product_details]
+        text: Third-party text carrying instructions, forged turn markers or fence copies is sanitized before the model reads it.
+        source: docs/safety.md "Fencing"
+      - id: EX-S-06
+        methods: [checkout, checkout_handoff]
+        text: checkout renders the cart on a card; a handoff URL rides on the card payload and never in the model's result.
+        source: docs/safety.md "No payment"; shopping_agent/enrichment.py
+      - id: EX-S-07
+        methods: [present_products]
+        text: A presentation call naming an id the server never returned is refused; known ids are joined from server records.
+        source: docs/safety.md "UI payloads"
+      - id: EX-S-08
+        methods: []
+        text: The executor refuses a tool name the deployment config does not build.
+        source: docs/safety.md "Tool surface"
+      - id: EX-S-09
+        methods: [search_products]
+        text: A backend exception is a soft error result, not an exception out of the executor.
+        source: docs/safety.md "Tool results"
+      - id: EX-S-10
+        methods: [update_cart_item, remove_from_cart]
+        text: A line the site put in the cart outside the chat can be updated and removed; cart membership alone grants it.
+        source: shopping_agent/gates.py _check_provenance_or_cart
+      - id: EX-S-11
+        methods: [add_to_cart]
+        text: With the cart at max_cart_lines, a new line is refused and nothing is written.
+        source: shopping_agent/gates.py gated_add_to_cart ("The cart is full")
+      - id: EX-S-12
+        methods: [add_to_cart]
+        text: Invalid model arguments (a non-numeric or negative quantity) are a soft error naming the argument; nothing is written.
+        source: docs/safety.md "Tool results"; commerce_common tool validation
+      - id: EX-S-13
+        methods: [get_cart, get_preferences, get_orders, search_policies, get_fulfillment_options]
+        text: Every read tool's result is fenced under the storefront label.
+        source: docs/safety.md "Fencing" ("every record read is fenced")
+      - id: EX-S-14
+        methods: [get_orders, add_to_cart]
+        text: Items of an order the customer read this turn pass provenance, so a reorder needs no search.
+        source: shopping_agent/backend.py get_orders ("Their items enter provenance")
+      - id: EX-S-15
+        methods: [search_products, add_to_cart]
+        text: Extra arguments the schema does not name are ignored, not an error.
+        source: docs/safety.md "Tool results" ("only the model's own arguments are reported as invalid")
+      - id: EX-S-16
+        methods: [search_policies]
+        text: Hostile text in a policy passage is sanitized before the model reads it.
+        source: docs/safety.md "Fencing" ("every record read is fenced")
+      - id: EX-S-17
+        methods: [get_orders]
+        text: Hostile text in an order item's title is sanitized before the model reads it.
+        source: docs/safety.md "Fencing"
+      - id: EX-S-18
+        methods: [save_memory, recall_memories]
+        text: A saved fact carrying fence markers or instructions is stored sanitized and read back fenced.
+        source: docs/safety.md "Memory writes"
+      - id: EX-S-19
+        methods: [get_fulfillment_options]
+        text: A fulfillment call naming more than twenty ids is a soft error or a bounded answer, never an exception.
+        source: shopping_agent/tools/registry.py get_fulfillment_options (maxItems 20)
+      - id: EX-S-20
+        methods: [update_cart_item]
+        text: An update above max_quantity_per_item is reduced to the cap and the cap is reported.
+        source: docs/safety.md "Cart provenance"; shopping_agent/gates.py gated_update_cart_item
+      - id: EX-S-22
+        methods: [get_fulfillment_options, get_preferences]
+        text: Hostile text in a fulfillment option's label or a preference value is sanitized before the model reads it.
+        source: docs/safety.md "Fencing" ("every record read is fenced")
+      - id: EX-S-23
+        methods: [save_memory]
+        text: A memory fact the model tries to save with an over-long or hostile value is truncated or refused, never stored raw.
+        source: docs/safety.md "Memory writes"; commerce_common/memory.py validate_fact
+      - id: EX-S-24
+        methods: [checkout, get_cart]
+        text: A cart at max_cart_lines renders on the checkout card whole and the model's result stays within max_fenced_chars.
+        source: docs/safety.md "Loop and size limits"; commerce_common/fencing.py fence_payload
+      - id: EX-S-21
+        methods: [checkout, checkout_handoff]
+        text: When checkout_handoff refuses a stale cart, checkout reports the refusal to the model naming the line, not an outage.
+        source: proposal anthropics/commerce-agents#20 (cart re-validation at checkout); docs/safety.md "Tool results" (the executor relays Unavailable through domain_error; the statement asks for a refusal that names the line and is not the outage text)
+
+  - id: EX-M
+    title: Merchant executor over any backend
+    layer: executor-merchant
+    statements:
+      - id: EX-M-01
+        methods: [stage_inventory_action]
+        text: A stage_* call naming a listing no tool returned this session is held by the provenance gate.
+        source: docs/safety.md "Staging provenance"
+      - id: EX-M-02
+        methods: [apply_change]
+        text: With require_host_approval on, apply_change for a change the host has not marked approved is held by the approval gate.
+        source: docs/safety.md "Host approval"
+      - id: EX-M-03
+        methods: [apply_change]
+        text: apply_change for a change the host marked approved applies it; a second apply reports it already applied.
+        source: docs/safety.md "Host approval"; merchant_agent/gates.py
+      - id: EX-M-04
+        methods: [stage_inventory_action]
+        text: A guardrail violation at staging is reported to the model and nothing is staged.
+        source: docs/safety.md "Guardrails"
+      - id: EX-M-05
+        methods: [search_listings]
+        text: Listing results reach the model fenced under the merchant label and enter provenance.
+        source: docs/safety.md "Fencing"
+      - id: EX-M-06
+        methods: [stage_listing_update]
+        text: A content edit needs the full record read this session in addition to search provenance.
+        source: docs/safety.md "Staging provenance"
+      - id: EX-M-07
+        methods: [stage_price_update]
+        text: A price update naming a family is held by the options gate before it reaches the backend.
+        source: merchant_agent/gates.py check_listing_options; backend.py class docstring
+      - id: EX-M-08
+        methods: [discard_change]
+        text: A discard the assistant drives is recorded as the agent's; one the host marked as its own action is recorded as the operator's.
+        source: merchant_agent/gates.py take_discard_actor_kind
+      - id: EX-M-09
+        methods: [apply_change, get_pending_changes]
+        text: A change staged outside this session is held by provenance until get_pending_changes lists it, then by approval.
+        source: merchant_agent/gates.py check_apply_change
+      - id: EX-M-10
+        methods: [stage_listing_update]
+        text: A listing field over max_listing_field_chars is refused with the limit named, never truncated into a live listing.
+        source: merchant_agent/executor.py stage_listing_update
+      - id: EX-M-11
+        methods: [search_listings]
+        text: Hostile listing text in merchant results is sanitized before the model reads it.
+        source: docs/safety.md "Fencing"; merchant_agent/fencing.py
+
+  - id: HS
+    title: Hardening beyond the written contract (proposals)
+    layer: hardening
+    statements:
+      - id: HS-S-01
+        methods: [add_to_cart]
+        text: add_to_cart of an id the catalog does not know raises Unavailable, not an arbitrary exception, and writes nothing.
+        source: hardening (the executor gates it; a backend called directly should refuse in kind)
+      - id: HS-S-02
+        methods: [add_to_cart]
+        text: add_to_cart of a family raises Unavailable naming its variants and writes nothing.
+        source: hardening
+      - id: HS-S-03
+        methods: [update_cart_item]
+        text: update_cart_item with a quantity under one is refused or removes the line; no line is ever stored below one.
+        source: hardening (types.py CartItem quantity ge=1)
+      - id: HS-S-04
+        methods: [checkout_handoff]
+        text: checkout_handoff on an empty cart yields no URL.
+        source: hardening
+      - id: HS-S-05
+        methods: [get_cart]
+        text: After the host resets a session, its cart is empty and a later add starts a fresh cart.
+        source: hardening (demo_common reset route; reset_session is a convention, not in the contract)
+      - id: HS-S-06
+        methods: [present_products]
+        text: Model-authored text on a card (a pick's reason) reaches the host without fence markers or invisible characters.
+        source: hardening (docs/safety.md "UI payloads" validates shape, not content)
+      - id: HS-S-07
+        methods: [checkout_handoff]
+        text: checkout_handoff re-validates the cart; a line that can no longer be bought raises Unavailable naming it and no payment URL is produced.
+        source: hardening (cart re-validation at checkout; proposal anthropics/commerce-agents#20)
+      - id: HS-S-08
+        methods: [request_order_action, get_order_requests]
+        text: request_order_action records a cancellation, return or problem for one of the customer's own orders as a request with a status; nothing is written to the platform, and another customer's or an unknown order is refused.
+        source: proposal anthropics/commerce-agents#22 (shopper order actions; optional StorefrontBackend methods)
+      - id: HS-S-09
+        methods: [request_order_action]
+        text: A cancellation is refused once the order has shipped and a return before it has; items named must belong to the order.
+        source: proposal anthropics/commerce-agents#22 (shopper order actions)
+      - id: HS-M-01
+        methods: [get_pending_changes, apply_change, discard_change]
+        text: A change is scoped to the merchant that staged it; a session for another merchant neither lists nor applies nor discards it.
+        source: hardening (backend.py scopes analysis to session.merchant_id; the ledger is not stated)
+      - id: HS-M-02
+        methods: [stage_inventory_action]
+        text: A restock without a quantity, or with zero, is refused rather than staged as a no-op.
+        source: hardening
+      - id: HS-M-03
+        methods: [apply_change]
+        text: Concurrent applies of one change apply it once; the other attempt is refused.
+        source: hardening
+      - id: HS-M-04
+        methods: [stage_promotion]
+        text: A promotion whose end precedes its start is refused.
+        source: hardening
+      - id: HS-M-05
+        methods: [apply_change]
+        text: A multi-item apply that fails part way stays staged, and a retry once the platform recovers converges every item to its staged after-value.
+        source: hardening (backend.py says "raise on a failed write"; it does not say what a retry does)
+      - id: HS-M-06
+        methods: [stage_promotion]
+        text: A promotion that already ended is refused.
+        source: hardening
+      - id: HS-M-07
+        methods: [stage_price_update, apply_change]
+        text: A price with more than two decimals is refused or rounded; it is never applied as written.
+        source: hardening
+      - id: HS-M-08
+        methods: [get_pending_changes, stage_inventory_action]
+        text: A staged change survives a restart; a new backend over the same store still lists it and can apply it.
+        source: hardening (a ledger that survives the process; merchant_agent/changes.py ChangeLedger is in memory)
+      - id: HS-M-09
+        methods: [apply_change]
+        text: Two backend instances over the same store applying one change apply it once; the other attempt is refused.
+        source: hardening (idempotent apply; proposal anthropics/commerce-agents#21)
+      - id: HS-M-10
+        methods: [apply_change]
+        text: An apply that dies after the platform write and before the stamp is completed by a retry without writing again.
+        source: hardening (change id as the idempotency key, per-item progress; proposal anthropics/commerce-agents#21)
+      - id: HS-M-12
+        methods: [apply_change]
+        text: A staged change is flagged when a pending change touches the same target and field, and a price or status change is refused at apply when the platform value moved since staging.
+        source: hardening (conflict flag at staging, staleness check at apply; proposal anthropics/commerce-agents#23)
+      - id: HS-M-13
+        methods: [apply_change]
+        text: An applied price, stock or content change can be undone; the inverse is staged like any change and applying it restores the values; a promotion or campaign cannot.
+        source: proposal anthropics/commerce-agents#24 (optional MerchantBackend method undo_change)
+      - id: HS-M-14
+        methods: [apply_change]
+        text: A staged change can be scheduled; it applies when its time has come, stamped with the scheduling operator, and not before.
+        source: proposal anthropics/commerce-agents#24 (schedule_change, apply_due_changes)
+      - id: HS-M-15
+        methods: [stage_promotion, get_pricing_context]
+        text: A promotion that would take a listing under its min_price is refused at staging.
+        source: hardening (types.py PricingContext.min_price; the discount cap alone does not protect the floor)
+      - id: EX-M-12
+        methods: [stage_price_update]
+        text: A change with max_items_per_change items previews every line on the card and the fenced result stays within max_fenced_chars.
+        source: docs/safety.md "Loop and size limits"
+      - id: BE-M-33
+        methods: [stage_listing_update]
+        text: A listing update with odd field values (empty, very long, unicode, fence markers) never raises an unhandled error; it is refused or staged (the executor sanitizes before the backend sees it).
+        source: merchant_agent/backend.py stage_listing_update
+      - id: HS-M-11
+        methods: [get_order_issues, resolve_order_request]
+        text: A shopper's open request is an order issue for the merchant; resolving it records the operator's decision, closes the issue, and an approved cancellation is written to the platform on the merchant's side.
+        source: proposal anthropics/commerce-agents#22 (shopper order actions; optional MerchantBackend method)
+
+  - id: RT
+    title: Runtime rules pinned by upstream's own suite (informational)
+    layer: runtime
+    statements:
+      - id: RT-01
+        methods: []
+        text: Grounding gates force a read on a turn's first iteration for terms, order and unseen-id messages.
+        source: docs/safety.md "Grounding"
+        upstream_tests: tests/test_turn_loop.py
+      - id: RT-02
+        methods: []
+        text: After max_tool_iterations the Messages API runtime forces a round without tools; past compact_history_above_tokens it clears the oldest tool results.
+        source: docs/safety.md "Loop and size limits"
+        upstream_tests: tests/test_turn_loop.py
+      - id: RT-03
+        methods: [save_memory, recall_memories]
+        text: Memory extraction reads only the last exchange's user and assistant text and never tool results.
+        source: docs/safety.md "Memory extraction"
+        upstream_tests: commerce-common/tests/test_memory_runtime.py
+      - id: RT-04
+        methods: []
+        text: The static prompt and tool list are byte-identical across requests; per-request data sits after the cache breakpoint.
+        source: CLAUDE.md design rules; docs/safety.md
+        upstream_tests: tests/test_turn_loop.py, tests/test_system_switches.py
+
+  - id: HOST
+    title: Host rules
+    layer: host
+    statements:
+      - id: HOST-01
+        methods: []
+        text: No route reads identity from the request; a session id is the only credential after session start.
+        source: docs/safety.md "Identity"
+        upstream_tests: examples/demo_common/tests/contract.py
+      - id: HOST-02
+        methods: [apply_change]
+        text: A preview card's approval marks the change on the host's side before the executor runs, and the mark does not outlive the click.
+        source: examples/demo_common/merchant.py change_action
+        upstream_tests: examples/demo_common/tests/contract.py
+
+  - id: E2E
+    title: End-to-end flows the Medusa adapter pins (offline over its store host, live over Medusa and Stripe)
+    layer: e2e
+    statements:
+      - id: E2E-01
+        methods: [search_products, get_product_details, add_to_cart, checkout, checkout_handoff]
+        text: Shopper searches, reads, adds, and checkout hands off to a hosted payment URL; the model never sees the URL.
+        source: docs/backends.md "Platform hosted checkout"; docs/safety.md "No payment"
+        adapter_tests: tests/test_order_placement.py::test_checkout_handoff_creates_a_stripe_session_for_the_cart, scripts/e2e_checkout.py (live)
+      - id: E2E-02
+        methods: [checkout_handoff, get_orders]
+        text: A paid webhook places the order once; a replayed event and a late webhook both leave exactly one order, and the shopper's get_orders shows it.
+        source: docs/safety.md "No payment"
+        adapter_tests: tests/test_host.py::test_paid_event_places_the_order_once, ::test_success_page_places_the_order_when_the_webhook_is_late, ::test_processed_events_survive_a_restart
+      - id: E2E-03
+        methods: [stage_price_update, stage_inventory_action, apply_change, search_products, get_product_details]
+        text: A merchant change approved in the portal is applied to the platform and the storefront's next read shows it.
+        source: docs/backends.md Step 5; docs/safety.md "Host approval"
+        adapter_tests: tests/test_cross_role_live.py::test_merchant_price_change_reaches_the_storefront, ::test_merchant_restock_changes_storefront_availability, tests/test_store_host.py::test_merchant_overview_chat_and_portal_approval
+      - id: E2E-04
+        methods: [get_business_snapshot, get_orders]
+        text: An order placed through the shopper flow appears in the merchant's snapshot for the day.
+        source: docs/backends.md Step 6
+        adapter_tests: tests/test_cross_role_live.py::test_live_orders_are_in_the_merchant_snapshot
+      - id: E2E-05
+        methods: []
+        text: A chat turn on the Agent SDK path streams tool calls, gate outcomes, UI payloads, cart updates, text and completion in order, one client per session.
+        source: hardening (shopping-agent/runtime-agent-sdk/README.md returns a turn whole; commerce_medusa/host/sdk_turn.py streams it)
+        adapter_tests: tests/test_sdk_turn.py, tests/test_store_host.py::test_session_chat_and_cart
+      - id: E2E-06
+        methods: []
+        text: The demo's access-code gate admits shoppers to the store and only the admin code to the portal; cookies expire and tampering is refused.
+        source: hardening (a deployed demo host; the reference ships no access gate)
+      - id: E2E-07
+        methods: [add_to_cart, update_cart_item, remove_from_cart, get_orders]
+        text: Search, details, cart writes and orders round-trip against the running store for a signed-in customer.
+        source: docs/backends.md (the StorefrontBackend contract, run against a live store)
+        adapter_tests: tests/test_medusa_live.py::test_search_details_cart_orders_round_trip
+      - id: E2E-09
+        methods: [request_order_action, get_order_issues, resolve_order_request]
+        text: On the SDK path the order-action tool is held until the order was read, then records the request; the merchant sees it as an issue and the portal resolves it.
+        source: proposal anthropics/commerce-agents#22 (shopper order actions)
+        adapter_tests: tests/test_sdk_turn.py::test_order_action_tool_needs_the_order_read_first_then_records, tests/test_medusa_merchant.py::test_open_requests_are_order_issues_and_an_approved_cancel_cancels_the_order
+      - id: E2E-10
+        methods: [checkout_handoff]
+        text: The webhook and the success page arriving together for one paid cart place one order; the second caller reads the first's result.
+        source: docs/safety.md "No payment"; commerce_medusa/host/app.py
+        adapter_tests: tests/test_host.py::test_webhook_and_success_page_racing_place_one_order
+      - id: E2E-08
+        methods: [checkout_handoff]
+        text: The host completes a paid cart only when the amount Stripe collected matches the cart's total at completion; a mismatch is held for review and nothing is placed.
+        source: hardening (the paid amount must match the cart at completion; proposal anthropics/commerce-agents#20)
+        adapter_tests: tests/test_host.py::test_mismatched_payment_is_held_not_placed, tests/test_order_placement.py::test_place_order_refuses_a_paid_amount_that_does_not_match_the_cart

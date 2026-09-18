@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "commerce-agents-conformance"
+version = "0.1.0"
+description = "A conformance suite a merchant runs against their own Claude Commerce Agents backend: 137 numbered statements, pytest mixins, a report and a generated interface contract."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [{ name = "Vishal Katyal", email = "vishal@katyal.ai" }]
+keywords = ["claude", "commerce", "agents", "conformance", "pytest"]
+classifiers = [
+  "Framework :: Pytest",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = [
+  "pytest>=8",
+  "pytest-asyncio>=0.24",
+  "pyyaml>=6",
+  # The reference implementation's packages are not on PyPI; they install from its repository
+  # at the commit this release was verified against.
+  "commerce-common @ git+https://github.com/anthropics/commerce-agents.git@fd4d59224ab96b43c6dc6888207c67b3bd5a24cf#subdirectory=commerce-common",
+  "shopping-agent-core @ git+https://github.com/anthropics/commerce-agents.git@fd4d59224ab96b43c6dc6888207c67b3bd5a24cf#subdirectory=shopping-agent/core",
+  "merchant-agent-core @ git+https://github.com/anthropics/commerce-agents.git@fd4d59224ab96b43c6dc6888207c67b3bd5a24cf#subdirectory=merchant-agent/core",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6"]
+# What the reference examples (the retail mock target) import on top of the core packages.
+examples = [
+  "commerce-common[examples] @ git+https://github.com/anthropics/commerce-agents.git@fd4d59224ab96b43c6dc6888207c67b3bd5a24cf#subdirectory=commerce-common",
+  "shopping-agent-runtime @ git+https://github.com/anthropics/commerce-agents.git@fd4d59224ab96b43c6dc6888207c67b3bd5a24cf#subdirectory=shopping-agent/runtime-messages-api",
+  "merchant-agent-runtime @ git+https://github.com/anthropics/commerce-agents.git@fd4d59224ab96b43c6dc6888207c67b3bd5a24cf#subdirectory=merchant-agent/runtime-messages-api",
+]
+
+[project.urls]
+Homepage = "https://github.com/vishkaty/commerce-agents-conformance"
+Issues = "https://github.com/vishkaty/commerce-agents-conformance/issues"
+"Reference implementation" = "https://github.com/anthropics/commerce-agents"
+
+[project.scripts]
+commerce-conformance-report = "commerce_conformance.report:main"
+commerce-conformance-contract = "commerce_conformance.contract:main"
+
+[project.entry-points.pytest11]
+commerce_conformance = "commerce_conformance.plugin"
+
+[tool.hatch.metadata]
+allow-direct-references = true  # the reference packages install from their git repository
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/commerce_conformance"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests", "examples"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
